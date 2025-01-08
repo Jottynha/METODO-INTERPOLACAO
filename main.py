@@ -1,0 +1,111 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import lagrange
+
+class InterpolationApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Interpolação")
+
+        # Título
+        ttk.Label(root, text="Interpolação de Pontos", font=("Arial", 16)).pack(pady=10)
+
+        # Entrada de pontos
+        frame = ttk.Frame(root)
+        frame.pack(pady=10)
+        ttk.Label(frame, text="Pontos (x,y):").grid(row=0, column=0, padx=5, pady=5)
+        self.points_entry = ttk.Entry(frame, width=50)
+        self.points_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.points_entry.insert(0, "0,0; 1,1; 2,4; 3,9")
+
+        # Entrada de ponto a ser avaliado
+        ttk.Label(frame, text="Ponto x para avaliar:").grid(row=1, column=0, padx=5, pady=5)
+        self.x_eval_entry = ttk.Entry(frame, width=20)
+        self.x_eval_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        # Escolha do método
+        ttk.Label(frame, text="Método:").grid(row=2, column=0, padx=5, pady=5)
+        self.method = ttk.Combobox(frame, values=["Linear", "Quadrática", "Lagrange"], state="readonly")
+        self.method.grid(row=2, column=1, padx=5, pady=5)
+        self.method.current(0)
+
+        # Botões
+        button_frame = ttk.Frame(root)
+        button_frame.pack(pady=10)
+        ttk.Button(button_frame, text="Interpolar", command=self.interpolate).grid(row=0, column=0, padx=10)
+        ttk.Button(button_frame, text="Limpar", command=self.clear).grid(row=0, column=1, padx=10)
+
+        # Área para exibir a função
+        self.result_label = ttk.Label(root, text="", font=("Arial", 12), foreground="blue")
+        self.result_label.pack(pady=10)
+
+    def parse_points(self):
+        try:
+            points = self.points_entry.get().strip().split(";")
+            points = [tuple(map(float, p.split(","))) for p in points]
+            x, y = zip(*points)
+            return np.array(x), np.array(y)
+        except ValueError:
+            messagebox.showerror("Erro", "Entrada de pontos inválida. Use o formato x,y; x,y...")
+            return None, None
+
+    def interpolate(self):
+        x, y = self.parse_points()
+        if x is None or y is None:
+            return
+
+        method = self.method.get()
+
+        try:
+            x_eval = float(self.x_eval_entry.get())
+        except ValueError:
+            messagebox.showerror("Erro", "Ponto x para avaliar inválido.")
+            return
+
+        # Pontos para interpolação
+        x_new = np.linspace(min(x), max(x), 100)
+
+        if method == "Linear":
+            coeffs = np.polyfit(x, y, 1)
+            f = np.poly1d(coeffs)
+        elif method == "Quadrática":
+            coeffs = np.polyfit(x, y, 2)
+            f = np.poly1d(coeffs)
+        elif method == "Lagrange":
+            f = lagrange(x, y)
+        else:
+            messagebox.showerror("Erro", "Método de interpolação desconhecido.")
+            return
+
+        y_new = f(x_new)
+
+        # Avaliar ponto
+        y_eval = f(x_eval)
+
+        # Exibir função e valor avaliado
+        self.result_label.config(text=f"Função: {f}\nValor em x={x_eval}: y={y_eval:.4f}")
+
+        # Plotar o resultado
+        plt.figure(figsize=(8, 5))
+        plt.plot(x, y, "o", label="Pontos Dados")
+        plt.plot(x_new, y_new, "-", label=f"Interpolação ({method})")
+        plt.scatter(x_eval, y_eval, color="red", label=f"Ponto Avaliado ({x_eval}, {y_eval:.4f})")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title(f"Interpolação - Método: {method}")
+        plt.legend()
+        plt.grid()
+        plt.show()
+
+    def clear(self):
+        self.points_entry.delete(0, tk.END)
+        self.points_entry.insert(0, "")
+        self.x_eval_entry.delete(0, tk.END)
+        self.result_label.config(text="")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = InterpolationApp(root)
+    root.mainloop()
