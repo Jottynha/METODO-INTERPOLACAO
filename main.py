@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import lagrange
-from sympy import symbols, sympify, diff, sin, cos, log
+from sympy import symbols, sympify, diff, sin, cos, log, simplify
 import math 
 
 class InterpolationApp:
@@ -45,8 +45,8 @@ class InterpolationApp:
         ttk.Button(button_frame, text="Interpolar", command=self.interpolate).grid(row=0, column=0, padx=10)
         ttk.Button(button_frame, text="Limpar", command=self.clear).grid(row=0, column=1, padx=10)
         ttk.Button(button_frame, text="Calcular Y para X", command=self.calculate_y_for_x).grid(row=1, column=0, padx=10, pady=5)
+        ttk.Button(button_frame, text="Diferenças Divididas e Polinômio", command=self.calculate_div_diff_and_polynomial).grid(row=0, column=2, padx=10)
 
-        # Área para exibir a função
         self.result_label = ttk.Label(root, text="", font=("Arial", 12), foreground="blue")
         self.result_label.pack(pady=10)
 
@@ -111,6 +111,93 @@ class InterpolationApp:
         plt.grid()
         plt.show()
 
+    def newton_polynomial(self, x, y, diff_table):
+        """
+        Constrói e retorna o polinômio de Newton a partir das diferenças divididas.
+        """
+        n = len(x)
+        terms = [f"{y[0]:.4f}"]  # O primeiro termo é apenas o y_0
+        polynomial = f"f(x) = {y[0]:.4f}"
+
+        # Constrói os termos do polinômio de Newton
+        for k in range(1, n):
+            term = f"({x[k-1]} - x)"
+            for i in range(k-1):
+                term = f"({x[i]} - x)" + term
+            term = f"({diff_table[0, k]:.4f}) * " + term
+            terms.append(term)
+            polynomial += f" + {diff_table[0, k]:.4f} * " + term
+
+        return polynomial, terms
+
+
+    def evaluate_and_simplify_polynomial(self, x, y, x_eval, diff_table):
+        """
+        Avalia e simplifica o polinômio de Newton no ponto x_eval.
+        """
+        n = len(x)
+        # Inicializa o polinômio de Newton
+        polynomial = 0
+        terms = []
+        
+        # Construa o polinômio de Newton
+        for k in range(n):
+            term = diff_table[0, k]
+            for i in range(k):
+                term *= (x_eval - x[i])
+            terms.append(term)
+            polynomial += term
+        
+        # Simplificar o polinômio usando sympy
+        x_sym = symbols('x')
+        polynomial_expr = 0
+        for k in range(n):
+            term = diff_table[0, k]
+            for i in range(k):
+                term *= (x_sym - x[i])
+            polynomial_expr += term
+        
+        # Simplifica o polinômio
+        simplified_polynomial = simplify(polynomial_expr)
+
+        # Avaliar o polinômio no ponto x_eval
+        y_eval = simplified_polynomial.subs(x_sym, x_eval)
+
+        # Exibir o polinômio simplificado
+        return simplified_polynomial, y_eval
+
+
+
+    def calculate_div_diff_and_polynomial(self):
+        x, y = self.parse_points()
+        if x is None or y is None:
+            return
+
+        # Calcular as diferenças divididas
+        div_diff_text, diff_table = self.div_dif(x, y)
+
+        # Ponto de avaliação
+        try:
+            x_eval = float(self.x_eval_entry.get())
+        except ValueError:
+            messagebox.showerror("Erro", "Ponto x para avaliar inválido.")
+            return
+
+        # Calcular o polinômio de Newton simplificado e avaliá-lo
+        polynomial_expr, y_eval = self.evaluate_and_simplify_polynomial(x, y, x_eval, diff_table)
+
+        # Exibir as diferenças divididas, o polinômio e o valor avaliado
+        div_diff_text += f"\n\nPolinômio de Newton: {polynomial_expr}\n\n"
+        div_diff_text += f"Valor do polinômio em x={x_eval}: y={y_eval:.4f}"
+
+        self.result_label.config(
+            text=f"Diferenças Divididas e Polinômio de Newton:\n{div_diff_text}"
+        )
+
+
+
+
+
     def calculate_y_for_x(self):
         try:
             # Obter valores de X
@@ -161,6 +248,29 @@ class InterpolationApp:
         self.function_entry.insert(0, "")
         self.x_eval_entry.delete(0, tk.END)
         self.result_label.config(text="")
+    def div_dif(self, x, y):
+        """
+        Calcula as diferenças divididas de Newton para interpolação.
+        """
+        n = len(x)
+        diff_table = np.zeros((n, n))
+        diff_table[:, 0] = y  # Primeira coluna são os y's originais
+
+        # Preenchendo a tabela de diferenças divididas
+        for j in range(1, n):
+            for i in range(n - j):
+                diff_table[i, j] = (diff_table[i+1, j-1] - diff_table[i, j-1]) / (x[i+j] - x[i])
+
+        # Criando a string para mostrar as diferenças divididas de forma ordenada
+        div_diff_text = ""
+        for j in range(1, n):
+            for i in range(n - j):
+                div_diff_text += f"Fórmula para Δ{j}({i}): Δ^{j}f({i}) = {diff_table[i, j]:.4f}\n"
+                
+        return div_diff_text, diff_table  # Retorna as diferenças divididas em formato legível
+
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
