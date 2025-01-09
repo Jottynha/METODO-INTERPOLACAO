@@ -3,6 +3,8 @@ from tkinter import ttk, messagebox
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import lagrange
+from sympy import symbols, sympify, diff, sin, cos, log
+import math 
 
 class InterpolationApp:
     def __init__(self, root):
@@ -20,15 +22,21 @@ class InterpolationApp:
         self.points_entry.grid(row=0, column=1, padx=5, pady=5)
         self.points_entry.insert(0, "0,0; 1,1; 2,4; 3,9")
 
+        # Entrada de função original
+        ttk.Label(frame, text="Função f(x):").grid(row=1, column=0, padx=5, pady=5)
+        self.function_entry = ttk.Entry(frame, width=50)
+        self.function_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.function_entry.insert(0, "sin(x)")
+
         # Entrada de ponto a ser avaliado
-        ttk.Label(frame, text="Ponto x para avaliar:").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(frame, text="Ponto x para avaliar:").grid(row=2, column=0, padx=5, pady=5)
         self.x_eval_entry = ttk.Entry(frame, width=20)
-        self.x_eval_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.x_eval_entry.grid(row=2, column=1, padx=5, pady=5)
 
         # Escolha do método
-        ttk.Label(frame, text="Método:").grid(row=2, column=0, padx=5, pady=5)
+        ttk.Label(frame, text="Método:").grid(row=3, column=0, padx=5, pady=5)
         self.method = ttk.Combobox(frame, values=["Linear", "Quadrática", "Lagrange"], state="readonly")
-        self.method.grid(row=2, column=1, padx=5, pady=5)
+        self.method.grid(row=3, column=1, padx=5, pady=5)
         self.method.current(0)
 
         # Botões
@@ -36,6 +44,7 @@ class InterpolationApp:
         button_frame.pack(pady=10)
         ttk.Button(button_frame, text="Interpolar", command=self.interpolate).grid(row=0, column=0, padx=10)
         ttk.Button(button_frame, text="Limpar", command=self.clear).grid(row=0, column=1, padx=10)
+        ttk.Button(button_frame, text="Calcular Y para X", command=self.calculate_y_for_x).grid(row=1, column=0, padx=10, pady=5)
 
         # Área para exibir a função
         self.result_label = ttk.Label(root, text="", font=("Arial", 12), foreground="blue")
@@ -80,12 +89,15 @@ class InterpolationApp:
             return
 
         y_new = f(x_new)
-
-        # Avaliar ponto
         y_eval = f(x_eval)
 
-        # Exibir função e valor avaliado
-        self.result_label.config(text=f"Função: {f}\nValor em x={x_eval}: y={y_eval:.4f}")
+        # Calcular erro de truncamento teórico
+        trunc_error = self.calculate_truncation_error(x, x_eval)
+
+        # Exibir função, valor avaliado e erro de truncamento
+        self.result_label.config(
+            text=f"Função: {f}\nValor em x={x_eval}: y={y_eval:.4f}\nErro Teórico: E≈{trunc_error:.4e}"
+        )
 
         # Plotar o resultado
         plt.figure(figsize=(8, 5))
@@ -99,9 +111,54 @@ class InterpolationApp:
         plt.grid()
         plt.show()
 
+    def calculate_y_for_x(self):
+        try:
+            # Obter valores de X
+            x_vals = self.points_entry.get().strip().split(";")
+            x_vals = [float(p.split(",")[0]) for p in x_vals]
+            function = self.function_entry.get()
+            f_sym = sympify(function, locals={"sin": sin, "cos": cos, "log": log})
+            x_sym = symbols("x")
+
+            # Calcular os valores de Y para os pontos X
+            y_vals = [f_sym.subs(x_sym, x_val) for x_val in x_vals]
+
+            # Exibir os resultados
+            y_vals_str = ", ".join([f"f({x}) = {y.evalf():.4f}" for x, y in zip(x_vals, y_vals)])
+            self.result_label.config(text=f"Valores de Y para X: {y_vals_str}")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao calcular os valores de Y: {e}")
+
+    def calculate_truncation_error(self, x, x_eval):
+        try:
+            # Obter função original do usuário
+            user_function = self.function_entry.get()
+            f_sym = sympify(user_function, locals={"sin": sin, "cos": cos, "log": log})
+            x_sym = symbols("x")
+
+            # Calcular derivada de ordem n+1
+            n = len(x) - 1
+            derivative = diff(f_sym, x_sym, n + 1)
+
+            # Avaliar derivada no ponto médio do intervalo
+            xi = (max(x) + min(x)) / 2
+            derivative_value = derivative.subs(x_sym, xi)
+
+            # Calcular produto dos termos (x_eval - xi)
+            product = np.prod([x_eval - xi for xi in x])
+
+            # Calcular erro teórico
+            trunc_error = abs(derivative_value * product / math.factorial(n + 1))
+            return trunc_error
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao calcular o erro de truncamento: {e}")
+            return 0
+
     def clear(self):
         self.points_entry.delete(0, tk.END)
         self.points_entry.insert(0, "")
+        self.function_entry.delete(0, tk.END)
+        self.function_entry.insert(0, "")
         self.x_eval_entry.delete(0, tk.END)
         self.result_label.config(text="")
 
