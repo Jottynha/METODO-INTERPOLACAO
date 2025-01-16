@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import lagrange
 from sympy import symbols, sympify, diff, sin, cos, log, simplify, factorial
 import math
+import time
+import psutil
 
 class InterpolationApp:
     def __init__(self, root):
@@ -64,17 +66,18 @@ class InterpolationApp:
         x, y = self.parse_points()
         if x is None or y is None:
             return
+
         method = self.method.get()
         x_eval = None
         try:
             x_eval = float(self.x_eval_entry.get())
         except ValueError:
-            pass  # Ignorar erro se x_eval não for fornecido
-
+            pass
         x_new = np.linspace(min(x), max(x), 100)
-        f = None 
-        trunc_error = None  
-
+        f = None
+        trunc_error = None
+        start_time = time.time()
+        start_memory = psutil.Process().memory_info().rss / (1024 * 1024)  # Usar memória em MB
         if method == "Linear":
             coeffs = np.polyfit(x, y, 1)
             f = np.poly1d(coeffs)
@@ -89,19 +92,22 @@ class InterpolationApp:
         else:
             messagebox.showerror("Erro", "Método de interpolação desconhecido.")
             return
-
         y_new = f(x_new)
         y_eval = None
         if x_eval is not None:
             y_eval = f(x_eval)
-
+        end_time = time.time()
+        end_memory = psutil.Process().memory_info().rss / (1024 * 1024)  # Memória após execução em MB
+        execution_time = end_time - start_time
+        memory_used = end_memory - start_memory
         polynomial_text = self.format_polynomial(f, method)
         result_text = f"Função: {polynomial_text}\n"
         if y_eval is not None:
             result_text += f"Valor em x={x_eval}: y={y_eval:.4f}\n"
         if trunc_error is not None:
             result_text += f"Erro Teórico: E≈{trunc_error:.4e}\n"
-
+        result_text += f"Tempo de Execução: {execution_time:.4f} segundos\n"
+        result_text += f"Memória Usada: {memory_used:.4f} MB\n"
         self.result_label.config(text=result_text)
         plt.figure(figsize=(8, 5))
         plt.plot(x, y, "o", label="Pontos Dados")
@@ -179,8 +185,6 @@ class InterpolationApp:
             result += term  
         return result
 
-
-
     def evaluate_and_simplify_polynomial(self, x, y, x_eval, diff_table):
         n = len(x)
         polynomial = 0
@@ -206,19 +210,45 @@ class InterpolationApp:
         x, y = self.parse_points()
         if x is None or y is None:
             return
+
+        start_time = time.time()
+        start_memory = psutil.Process().memory_info().rss / (1024 * 1024)
+
         div_diff_text, diff_table = self.div_dif(x, y)
+        
         try:
             x_eval = float(self.x_eval_entry.get())
         except ValueError:
             messagebox.showerror("Erro", "Ponto x para avaliar inválido.")
+            return
+
         polynomial_expr, y_eval = self.evaluate_and_simplify_polynomial(x, y, x_eval, diff_table)
+        
         div_diff_text += f"\n\nPolinômio de Newton: {polynomial_expr}\n\n"
         div_diff_text += f"Valor do polinômio em x={x_eval}: y={y_eval:.4f}"
+
         self.result_label.config(
             text=f"Diferenças Divididas e Polinômio de Newton:\n{div_diff_text}"
         )
+
         x_new = np.linspace(min(x), max(x), 100)
+
         y_new = [self.newton_polynomial(x, y, diff_table, xi) for xi in x_new]
+
+        end_time = time.time()
+        end_memory = psutil.Process().memory_info().rss / (1024 * 1024)
+
+        execution_time = end_time - start_time
+        memory_used = end_memory - start_memory
+
+        result_text = div_diff_text
+        result_text += f"\n\nTempo de Execução: {execution_time:.4f} segundos\n"
+        result_text += f"Memória Usada: {memory_used:.4f} MB\n"
+
+        self.result_label.config(
+            text=result_text
+        )
+
         plt.figure(figsize=(8, 5))
         plt.plot(x, y, 'o', label="Pontos Dados")
         plt.plot(x_new, y_new, '-', label="Interpolação de Newton")
@@ -296,20 +326,50 @@ class InterpolationApp:
         x, y = self.parse_points()
         if x is None or y is None:
             return
+
+        start_time = time.time()
+        start_memory = psutil.Process().memory_info().rss / (1024 * 1024)
+
         finite_diff_text, diff_table = self.finite_differences(x, y)
+
         try:
             x_eval = float(self.x_eval_entry.get())
         except ValueError:
             messagebox.showerror("Erro", "Ponto x para avaliar inválido.")
             return
+
         polynomial_expr, y_eval, terms, truncation_error = self.evaluate_and_simplify_polynomial_gregory_newton(x, y, x_eval, diff_table)
+
         finite_diff_text += f"\n\nPolinômio de Diferenças Finitas: {polynomial_expr}\n\n"
         finite_diff_text += f"Valor do polinômio em x={x_eval}: y={y_eval:.4f}"
         finite_diff_text += f"\nValor do Erro de Truncamento:{truncation_error}"
 
+        end_time = time.time()
+        end_memory = psutil.Process().memory_info().rss / (1024 * 1024)
+
+        execution_time = end_time - start_time
+        memory_used = end_memory - start_memory
+
+        result_text = finite_diff_text
+        result_text += f"\n\nTempo de Execução: {execution_time:.4f} segundos\n"
+        result_text += f"Memória Usada: {memory_used:.4f} MB\n"
+
         self.result_label.config(
-            text=f"Diferenças Finitas e Polinômio:\n{finite_diff_text}"
+            text=result_text
         )
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
