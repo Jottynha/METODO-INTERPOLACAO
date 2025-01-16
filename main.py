@@ -169,18 +169,16 @@ class InterpolationApp:
             derivative = abs((y[i + 1] - y[i]) / (x[i + 1] - x[i]))
             max_derivative = max(max_derivative, derivative)
         return max_derivative * h**(n + 1) / (n + 1)  
-    def newton_polynomial(self, x, y, diff_table):
+    def newton_polynomial(self, x, y, diff_table, xi):
         n = len(x)
-        terms = [f"{y[0]:.4f}"]
-        polynomial = f"f(x) = {y[0]:.4f}"
+        result = y[0]
         for k in range(1, n):
-            term = f"({x[k-1]} - x)"
-            for i in range(k-1):
-                term = f"({x[i]} - x)" + term
-            term = f"({diff_table[0, k]:.4f}) * " + term
-            terms.append(term)
-            polynomial += f" + {diff_table[0, k]:.4f} * " + term
-        return polynomial, terms
+            term = diff_table[0, k]  
+            for i in range(k):
+                term *= (xi - x[i]) 
+            result += term  
+        return result
+
 
 
     def evaluate_and_simplify_polynomial(self, x, y, x_eval, diff_table):
@@ -213,14 +211,25 @@ class InterpolationApp:
             x_eval = float(self.x_eval_entry.get())
         except ValueError:
             messagebox.showerror("Erro", "Ponto x para avaliar inválido.")
-            return
         polynomial_expr, y_eval = self.evaluate_and_simplify_polynomial(x, y, x_eval, diff_table)
         div_diff_text += f"\n\nPolinômio de Newton: {polynomial_expr}\n\n"
         div_diff_text += f"Valor do polinômio em x={x_eval}: y={y_eval:.4f}"
-
         self.result_label.config(
             text=f"Diferenças Divididas e Polinômio de Newton:\n{div_diff_text}"
         )
+        x_new = np.linspace(min(x), max(x), 100)
+        y_new = [self.newton_polynomial(x, y, diff_table, xi) for xi in x_new]
+        plt.figure(figsize=(8, 5))
+        plt.plot(x, y, 'o', label="Pontos Dados")
+        plt.plot(x_new, y_new, '-', label="Interpolação de Newton")
+        if x_eval is not None:
+            plt.scatter(x_eval, y_eval, color="red", label=f"Ponto Avaliado ({x_eval}, {y_eval:.4f})")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title("Interpolação - Polinômio de Newton")
+        plt.legend()
+        plt.grid()
+        plt.show()
 
     def finite_differences(self, x, y):
         n = len(x)
