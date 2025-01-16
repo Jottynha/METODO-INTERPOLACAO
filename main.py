@@ -60,43 +60,54 @@ class InterpolationApp:
         except ValueError:
             messagebox.showerror("Erro", "Entrada de pontos inválida. Use o formato x,y; x,y...")
             return None, None
-
     def interpolate(self):
         x, y = self.parse_points()
         if x is None or y is None:
             return
-
         method = self.method.get()
-
+        x_eval = None
         try:
             x_eval = float(self.x_eval_entry.get())
         except ValueError:
-            messagebox.showerror("Erro", "Ponto x para avaliar inválido.")
-            return
+            pass  # Ignorar erro se x_eval não for fornecido
+
         x_new = np.linspace(min(x), max(x), 100)
+        f = None 
+        trunc_error = None  
 
         if method == "Linear":
             coeffs = np.polyfit(x, y, 1)
             f = np.poly1d(coeffs)
+            trunc_error = self.truncation_error_linear(x, y)
         elif method == "Quadrática":
             coeffs = np.polyfit(x, y, 2)
             f = np.poly1d(coeffs)
+            trunc_error = self.truncation_error_quadratic(x, y)
         elif method == "Lagrange":
             f = lagrange(x, y)
+            trunc_error = self.truncation_error_lagrange(x, y)
         else:
             messagebox.showerror("Erro", "Método de interpolação desconhecido.")
             return
 
         y_new = f(x_new)
-        y_eval = f(x_eval)
-        trunc_error = self.calculate_truncation_error(x, x_eval)
-        self.result_label.config(
-            text=f"Função: {f}\nValor em x={x_eval}: y={y_eval:.4f}\nErro Teórico: E≈{trunc_error:.4e}"
-        )
+        y_eval = None
+        if x_eval is not None:
+            y_eval = f(x_eval)
+
+        polynomial_text = self.format_polynomial(f, method)
+        result_text = f"Função: {polynomial_text}\n"
+        if y_eval is not None:
+            result_text += f"Valor em x={x_eval}: y={y_eval:.4f}\n"
+        if trunc_error is not None:
+            result_text += f"Erro Teórico: E≈{trunc_error:.4e}\n"
+
+        self.result_label.config(text=result_text)
         plt.figure(figsize=(8, 5))
         plt.plot(x, y, "o", label="Pontos Dados")
         plt.plot(x_new, y_new, "-", label=f"Interpolação ({method})")
-        plt.scatter(x_eval, y_eval, color="red", label=f"Ponto Avaliado ({x_eval}, {y_eval:.4f})")
+        if x_eval is not None:
+            plt.scatter(x_eval, y_eval, color="red", label=f"Ponto Avaliado ({x_eval}, {y_eval:.4f})")
         plt.xlabel("x")
         plt.ylabel("y")
         plt.title(f"Interpolação - Método: {method}")
@@ -104,6 +115,60 @@ class InterpolationApp:
         plt.grid()
         plt.show()
 
+    def format_polynomial(self, f, method):
+        """
+        Formata a função interpoladora no formato "ax^2 + bx + c".
+        Para funções de Lagrange, utiliza uma representação simplificada.
+        """
+        if isinstance(f, np.poly1d):
+            terms = []
+            coeffs = f.coefficients
+            degree = len(coeffs) - 1
+            for i, coef in enumerate(coeffs):
+                if abs(coef) > 1e-10:  # Ignorar coeficientes próximos de zero
+                    power = degree - i
+                    if power == 0:
+                        terms.append(f"{coef:.4g}")
+                    elif power == 1:
+                        terms.append(f"{coef:.4g}x")
+                    else:
+                        terms.append(f"{coef:.4g}x^{power}")
+            return " + ".join(terms).replace("+ -", "- ")
+        elif method == "Lagrange":
+            return "Interpolação de Lagrange (pode ser complexa para exibição direta)"
+        else:
+            return "Função não formatável"
+
+
+    def truncation_error_linear(self, x, y):
+        """
+        Calcula o erro de truncamento para interpolação linear.
+        """
+        h = max(x) - min(x)
+        return h**2 / 8 
+
+    def truncation_error_quadratic(self, x, y):
+        """
+        Calcula o erro de truncamento para interpolação quadrática.
+        """
+        h = max(x) - min(x)
+        max_second_derivative = 0 
+        for i in range(len(x) - 1):
+            second_derivative = (y[i + 1] - 2 * y[i] + y[i - 1]) / ((x[i + 1] - x[i]) ** 2)
+            max_second_derivative = max(max_second_derivative, abs(second_derivative))
+        return max_second_derivative * h**3 / 24
+
+    def truncation_error_lagrange(self, x, y):
+        """
+        Calcula o erro de truncamento para interpolação de Lagrange.
+        """
+        h = max(x) - min(x)
+        n = len(x)
+        max_derivative = 0  
+        for i in range(n - 1):
+            derivative = abs((y[i + 1] - y[i]) / (x[i + 1] - x[i]))
+            max_derivative = max(max_derivative, derivative)
+        return max_derivative * h**(n + 1) / (n + 1)  
     def newton_polynomial(self, x, y, diff_table):
         n = len(x)
         terms = [f"{y[0]:.4f}"]
