@@ -109,6 +109,9 @@ class InterpolationApp:
         result_text += f"Tempo de Execução: {execution_time:.4f} segundos\n"
         result_text += f"Memória Usada: {memory_used:.4f} MB\n"
         self.result_label.config(text=result_text)
+        output_file = "resultados_saida.txt"
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(result_text)
         plt.figure(figsize=(8, 5))
         plt.plot(x, y, "o", label="Pontos Dados")
         plt.plot(x_new, y_new, "-", label=f"Interpolação ({method})")
@@ -158,11 +161,14 @@ class InterpolationApp:
         Calcula o erro de truncamento para interpolação quadrática.
         """
         h = max(x) - min(x)
-        max_second_derivative = 0 
-        for i in range(len(x) - 1):
-            second_derivative = (y[i + 1] - 2 * y[i] + y[i - 1]) / ((x[i + 1] - x[i]) ** 2)
-            max_second_derivative = max(max_second_derivative, abs(second_derivative))
-        return max_second_derivative * h**3 / 24
+        max_third_derivative = 0
+
+        for i in range(1, len(x) - 2):  # Garante que i+2 e i-1 estejam dentro dos limites
+            third_derivative = (y[i + 2] - 3 * y[i + 1] + 3 * y[i] - y[i - 1]) / ((x[i + 1] - x[i]) ** 3)
+            max_third_derivative = max(max_third_derivative, abs(third_derivative))
+
+        return max_third_derivative * h**3 / 24
+
 
     def truncation_error_lagrange(self, x, y):
         """
@@ -184,7 +190,6 @@ class InterpolationApp:
                 term *= (xi - x[i]) 
             result += term  
         return result
-
     def evaluate_and_simplify_polynomial(self, x, y, x_eval, diff_table):
         n = len(x)
         polynomial = 0
@@ -248,6 +253,9 @@ class InterpolationApp:
         self.result_label.config(
             text=result_text
         )
+        output_file = "resultados_saida.txt"
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(result_text)
 
         plt.figure(figsize=(8, 5))
         plt.plot(x, y, 'o', label="Pontos Dados")
@@ -357,21 +365,9 @@ class InterpolationApp:
         self.result_label.config(
             text=result_text
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        output_file = "resultados_saida.txt"
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(result_text)
 
     def calculate_y_for_x(self):
         try:
@@ -401,7 +397,6 @@ class InterpolationApp:
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao calcular o erro de truncamento: {e}")
             return 0
-
     def clear(self):
         self.points_entry.delete(0, tk.END)
         self.points_entry.insert(0, "")
@@ -420,12 +415,7 @@ class InterpolationApp:
         for j in range(1, n):
             for i in range(n - j):
                 div_diff_text += f"Fórmula para Δ{j}({i}): Δ^{j}f({i}) = {diff_table[i, j]:.4f}\n"
-                
-        return div_diff_text, diff_table  # Retorna as diferenças divididas em formato legível
-    
-
-
-
+        return div_diff_text, diff_table  
 if __name__ == "__main__":
     root = tk.Tk()
     app = InterpolationApp(root)
